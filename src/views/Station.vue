@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { routes, devices } from '../mock'
+import { devices } from '../mock'
 import { useTestStore } from '../store'
 
 const store = useTestStore()
@@ -26,8 +26,13 @@ function draw() {
   context.strokeStyle = '#e2e8f0'; context.lineWidth = 1
   for (let i=0;i<=100;i+=5) { context.beginPath(); context.moveTo(i*unitX,0); context.lineTo(i*unitX,rect.height); context.stroke(); context.beginPath(); context.moveTo(0,i*unitY); context.lineTo(rect.width,i*unitY); context.stroke() }
   context.lineCap = 'round'; context.lineJoin = 'round'
-  routes.forEach((route) => {
+  store.routeList.forEach((route) => {
     const selected = store.selectedRouteIds.includes(route.id)
+    const affected = store.currentBatch?.affectedRouteIds.includes(route.id)
+    if (affected) {
+      context.beginPath(); route.points.forEach((point,index)=>{ const x=point[0]*unitX, y=point[1]*unitY; if(index===0)context.moveTo(x,y); else context.lineTo(x,y) })
+      context.strokeStyle = '#f59e0b'; context.lineWidth = 13; context.globalAlpha = .3; context.stroke(); context.globalAlpha = 1
+    }
     context.beginPath(); route.points.forEach((point,index)=>{ const x=point[0]*unitX, y=point[1]*unitY; if(index===0)context.moveTo(x,y); else context.lineTo(x,y) })
     context.strokeStyle = selected ? route.color : '#94a3b8'; context.lineWidth = selected ? 7 : 3; context.globalAlpha = selected ? 1 : .42; context.stroke(); context.globalAlpha = 1
   })
@@ -40,18 +45,20 @@ function draw() {
 }
 function hitTest(event: MouseEvent) {
   const rect = canvas.value!.getBoundingClientRect(); const x=event.offsetX, y=event.offsetY
-  let closest = routes[0]!; let distance = Infinity
-  routes.forEach((route)=>{ route.points.forEach((point)=>{ const d=Math.hypot(point[0]/100*rect.width-x,point[1]/100*rect.height-y); if(d<distance){distance=d;closest=route} }) })
+  let closest = store.routeList[0]!; let distance = Infinity
+  store.routeList.forEach((route)=>{ route.points.forEach((point)=>{ const d=Math.hypot(point[0]/100*rect.width-x,point[1]/100*rect.height-y); if(d<distance){distance=d;closest=route} }) })
   if (distance < 45) store.selectedRouteIds = [closest.id]
 }
 onMounted(async()=>{ await nextTick(); draw(); resizeObserver=new ResizeObserver(draw); resizeObserver.observe(canvas.value!) })
 onBeforeUnmount(()=>resizeObserver?.disconnect())
 watch(()=>store.selectedCaseId, draw)
 watch(()=>store.selectedRouteIds, draw, { deep:true })
+watch(()=>store.currentBatchId, draw)
+watch(()=>store.routeList, draw, { deep:true })
 </script>
 
 <template>
-  <section class="page-head"><div><p class="eyebrow">站场与进路关系</p><h1>Canvas 站场示意</h1><p>点击进路联动设备清单和受影响用例；缩放后可检查道岔、信号机和轨道区段关系。</p></div><n-space><n-button @click="zoom=Math.max(.7,zoom-.1); draw()">缩小</n-button><span>{{Math.round(zoom*100)}}%</span><n-button @click="zoom=Math.min(1.5,zoom+.1); draw()">放大</n-button></n-space></section>
-  <div class="station-grid"><article class="card canvas-card"><div class="canvas-head"><span>海州站 · 计算机联锁平面示意</span><span>实线高亮：当前用例关联进路</span></div><canvas ref="canvas" class="station-canvas" @click="hitTest" /></article>
-    <aside class="card"><div class="panel-head"><div><h2>进路关系</h2><p>点击高亮或选择用例</p></div><n-tag>{{store.selectedRouteIds.length}} 条</n-tag></div><button v-for="route in routes" :key="route.id" class="route-row" :class="{active:store.selectedRouteIds.includes(route.id)}" @click="store.selectedRouteIds=[route.id]"><i :style="{background:route.color}"></i><div><b>{{route.id}} · {{route.name}}</b><small>{{route.devices.join(' → ')}}</small></div></button><n-divider /><h3>设备变更影响</h3><n-alert v-for="item in routes.filter((route)=>store.selectedRouteIds.includes(route.id)).flatMap((route)=>route.affectedBy)" :key="item" type="warning" :title="item" class="issue" /></aside></div>
+  <section class="page-head"><div><p class="eyebrow">站场与进路关系</p><h1>Canvas 站场示意</h1><p>点击进路联动设备清单和受影响用例；橙色光晕为当前批次 {{store.currentBatch?.id}}（G{{store.currentBatch?.generation}}）影响进路。</p></div><n-space><n-tag type="info">当前批次 {{store.currentBatch?.id}} · G{{store.currentBatch?.generation}}</n-tag><n-button @click="zoom=Math.max(.7,zoom-.1); draw()">缩小</n-button><span>{{Math.round(zoom*100)}}%</span><n-button @click="zoom=Math.min(1.5,zoom+.1); draw()">放大</n-button></n-space></section>
+  <div class="station-grid"><article class="card canvas-card"><div class="canvas-head"><span>海州站 · 计算机联锁平面示意</span><span>实线高亮：当前用例关联进路 · 橙色光晕：当前批次影响进路</span></div><canvas ref="canvas" class="station-canvas" @click="hitTest" /></article>
+    <aside class="card"><div class="panel-head"><div><h2>进路关系</h2><p>点击高亮或选择用例</p></div><n-tag>{{store.selectedRouteIds.length}} 条</n-tag></div><button v-for="route in store.routeList" :key="route.id" class="route-row" :class="{active:store.selectedRouteIds.includes(route.id)}" @click="store.selectedRouteIds=[route.id]"><i :style="{background:route.color}"></i><div><b>{{route.id}} · {{route.name}}<n-tag v-if="store.currentBatch?.affectedRouteIds.includes(route.id)" size="tiny" type="warning" style="margin-left:6px">本批影响</n-tag></b><small>{{route.devices.join(' → ')}}</small></div></button><n-divider /><h3>设备变更影响</h3><n-alert v-for="item in store.routeList.filter((route)=>store.selectedRouteIds.includes(route.id)).flatMap((route)=>route.affectedBy)" :key="item" type="warning" :title="item" class="issue" /></aside></div>
 </template>

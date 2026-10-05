@@ -18,14 +18,26 @@ export interface RouteRelation {
   affectedBy: string[]
 }
 
+export interface StepArchive {
+  batchId: string
+  generation: number
+  result: TestStep['result']
+  actual?: string
+  evidence?: string
+}
+
 export interface TestStep {
   id: string
   action: string
   expected: string
   dependency?: string
+  deviceIds?: string[]
   result: '未执行' | '通过' | '失败'
   actual?: string
   evidence?: string
+  batchId?: string
+  invalidatedBy?: string
+  history?: StepArchive[]
 }
 
 export interface TestCase {
@@ -48,4 +60,38 @@ export interface ExecutionRecord {
   snapshot: string
   result: TestStatus
   evidence: string[]
+  generation?: number
+  batchId?: string
+  backfilled?: boolean
+}
+
+export type ReceiptStatus = '已入批' | '重复拒收' | '待判' | '已驳回'
+
+export interface ChangeReceipt {
+  id: string
+  docNo: string
+  sender: string
+  kind: '设备变更' | '进路关系变更'
+  deviceId?: string
+  summary: string
+  routeId?: string
+  routeDevicesAfter?: string[]
+  baseBatchId: string
+  receivedAt: string
+  status: ReceiptStatus
+  batchId?: string
+  generation?: number
+}
+
+export interface Batch {
+  id: string
+  generation: number
+  status: '当前' | '历史'
+  receiptIds: string[]
+  createdBy: string
+  createdAt: string
+  affectedRouteIds: string[]
+  scopeCaseIds: string[]
+  invalidatedSteps: { caseId: string; stepId: string }[]
+  locked: boolean
 }
