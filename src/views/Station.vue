@@ -51,7 +51,7 @@ watch(()=>store.selectedRouteIds, draw, { deep:true })
 </script>
 
 <template>
-  <section class="page-head"><div><p class="eyebrow">站场与进路关系</p><h1>Canvas 站场示意</h1><p>点击进路联动设备清单和受影响用例；缩放后可检查道岔、信号机和轨道区段关系。</p></div><n-space><n-button @click="zoom=Math.max(.7,zoom-.1); draw()">缩小</n-button><span>{{Math.round(zoom*100)}}%</span><n-button @click="zoom=Math.min(1.5,zoom+.1); draw()">放大</n-button></n-space></section>
+  <section class="page-head"><div><p class="eyebrow">站场与进路关系</p><h1>Canvas 站场示意</h1><p>点击进路联动设备清单和受影响用例；缩放后可检查道岔、信号机和轨道区段关系。</p></div><n-space><n-tag type="info">当前批次 {{store.currentBatch?.generation ?? '—'}}</n-tag><n-button @click="zoom=Math.max(.7,zoom-.1); draw()">缩小</n-button><span>{{Math.round(zoom*100)}}%</span><n-button @click="zoom=Math.min(1.5,zoom+.1); draw()">放大</n-button></n-space></section>
   <div class="station-grid"><article class="card canvas-card"><div class="canvas-head"><span>海州站 · 计算机联锁平面示意</span><span>实线高亮：当前用例关联进路</span></div><canvas ref="canvas" class="station-canvas" @click="hitTest" /></article>
     <aside class="card"><div class="panel-head"><div><h2>进路关系</h2><p>点击高亮或选择用例</p></div><n-tag>{{store.selectedRouteIds.length}} 条</n-tag></div><button v-for="route in routes" :key="route.id" class="route-row" :class="{active:store.selectedRouteIds.includes(route.id)}" @click="store.selectedRouteIds=[route.id]"><i :style="{background:route.color}"></i><div><b>{{route.id}} · {{route.name}}</b><small>{{route.devices.join(' → ')}}</small></div></button><n-divider /><h3>设备变更影响</h3><n-alert v-for="item in routes.filter((route)=>store.selectedRouteIds.includes(route.id)).flatMap((route)=>route.affectedBy)" :key="item" type="warning" :title="item" class="issue" /></aside></div>
 </template>
